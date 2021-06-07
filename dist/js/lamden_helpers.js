@@ -69,7 +69,7 @@ class WalletController {
         } else {
           data.errors.forEach(err => {
             if (err === "Wallet is Locked") {
-              this.locked = true; 
+              this.locked = true;
             }
 
           })
@@ -132,12 +132,12 @@ class WalletController {
       await this.sendConnection().then(data => {
         if (data.errors) {
           if (data.errors[0] === 'Wallet is Locked') {
-  
+
             document.dispatchEvent(new CustomEvent('lamdenWalletLocked'));
             this.locked = true;
           }
           if (data.errors[0] === 'User rejected connection request') {
-  
+
             document.dispatchEvent(new CustomEvent('lamdenContractNotApproved'));
 
           }
@@ -501,8 +501,20 @@ class RocketSwapAPI {
   showBalances = async function (token_list_data, lastTauPrice, account_value_tau, account_value_usd) {
     let walletData = await this.getBalances()
     let user_stake = await this.getUserStaking();
-    let tau_staked = user_stake.con_simple_staking_tau_rswp_001.yield_info.total_staked
-    let rswp_staked = user_stake.con_staking_rswp_rswp.yield_info.total_staked
+    let tau_staked;
+    let rswp_staked;
+    try {
+      tau_staked = user_stake.con_simple_staking_tau_rswp_001.yield_info.total_staked
+    }
+    catch {
+      tau_staked = null
+    }
+    try {
+      rswp_staked = user_stake.con_staking_rswp_rswp.yield_info.total_staked
+    }
+    catch {
+      rswp_staked = null
+    }
     let token_list = walletData.balances
     let tokens = Object.keys(token_list)
     let tauPrice = parseFloat(lastTauPrice).toFixed(2)
@@ -636,13 +648,20 @@ class RocketSwapAPI {
   getLPBalances = async function () {
     let url = this.baseURL + this.Endpoints.userPoolINFO + this.address
     const res = await fetch(url, this.opts);
-    const pool = await res.json();
+    let pool;
+    try {
+      pool = await res.json();
+    }
+    catch {
+      pool = null
+    }
 
     return pool
   }
 
   getUserStaking = async function () {
     let url = this.baseURL + this.Endpoints.userStakingINFO + this.address
+    console.log(url)
     const res = await fetch(url, this.opts);
     const staking = await res.json();
     return staking
@@ -729,6 +748,7 @@ class RocketSwapTradeCenter {
 
     }
     await this.connector.lwc.sendTransaction(txInfo, handleResults) // callback is optional
+    window.scrollTo(0, document.body.scrollHeight);
     _print('\nawaiting transaction result...')
     showLoading()
 
@@ -791,6 +811,7 @@ class RocketSwapTradeCenter {
 
             _print_link('\n[ EXECUTE TRADE ]', async () => {
               await this._execute_trade(token, token_amount, method)
+              
             }, `execute_trade_${guid()}`)
             _print_link('\n[ EDIT TRADE ]', () => {
               this._enter_trade_info(token, sellable)
@@ -944,7 +965,7 @@ class RocketSwapController {
   constructor(Connector) {
     const App = {}
     this.connector = Connector;
-    this.YOUR_ADDRESS;
+    this.YOUR_ADDRESS = this.connector.lwc.walletAddress;
     this.trade_controller;
     this.tauPrice;
     this.rswpPrice;
@@ -1013,7 +1034,7 @@ class RocketSwapController {
             }
           }
           let tradingApproved;
-          let trading_cookie = localStorage.getItem('rswp_trading');
+          let trading_cookie = localStorage.getItem('rswp_trading_approval');
           if (trading_cookie) {
             tradingApproved = trading_cookie
           }
@@ -1042,7 +1063,7 @@ class RocketSwapController {
             this.change_menu('rswp_trade')
           }
 
-          window.scrollTo(0,document.body.scrollHeight);
+          window.scrollTo(0, document.body.scrollHeight);
         }, `rswp_trade_${uuid}_${guid()}`)
       },
       'token_list': (uuid) => {
@@ -1059,12 +1080,12 @@ class RocketSwapController {
                 this.show_token_info(this.token_list[token]);
                 this.token_list_uuids.add(`${token}_token_option`)
                 this.change_menu(`${token}_token_option`)
-                window.scrollTo(0,document.body.scrollHeight);
+                window.scrollTo(0, document.body.scrollHeight);
               },
               `${token}_token_option`
             )
           })
-          window.scrollTo(0,document.body.scrollHeight);
+          window.scrollTo(0, document.body.scrollHeight);
           this.change_menu('token_list')
         }, `token_list_${uuid}_${guid()}`)
       },
@@ -1074,12 +1095,18 @@ class RocketSwapController {
           showLoading()
 
           let lp_balances = await this.API.getLPBalances();
-          _print_bold('\n|-- USER STAKING POINTS --|\n')
+          if (lp_balances == null) {
+            _print_bold('USER DOES NOT HAVE ANY LP POINTS ACCUMULATED')
+          }
+          else {
+            _print_bold('\n|-- USER LP POINTS --|\n')
           Object.keys(lp_balances.points).map(token => {
             _print(`${token}: ${lp_balances.points[token]}`)
           })
           this.change_menu('rswp_pools')
-          window.scrollTo(0,document.body.scrollHeight);
+          }
+          
+          window.scrollTo(0, document.body.scrollHeight);
         }, `rswp_pools_${uuid}_${guid()}`)
       },
       'user_staking': (uuid) => {
@@ -1161,24 +1188,31 @@ class RocketSwapController {
             _print_inline(`emmission: year ${parseFloat(contract_meta.EmissionRatePerTauYearly).toFixed(2)}% hour ${parseFloat(contract_meta.EmissionRatePerHour).toFixed(2)}% second: ${parseFloat(contract_meta.EmissionRatePerSecond).toFixed(2)}%\n`)
 
 
-            _print_bold('\n\n          [ deposit record ]\n')
-            let amount;
-            let total = 0
-            let deposits = 1
-            for (let d in deposit_info.deposits) {
-              _print('\n╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳\n\n')
-              let deposit = deposit_info.deposits[d]
-              let deposit_record = show_time(deposit.time.__time__)
-              _print(`date of deposit: ${deposit_record.date}`)
-              _print(`time of deposit: ${deposit_record.time}`)
-              amount = parseFloat(deposit.amount.__fixed__);
-              total = total + amount
-              _print(`amount deposited: ${amount} ${token.bold()}`)
-              deposits = deposits + 1
+
+            try {
+              _print_bold('\n\n          [ deposit record ]\n')
+              let amount;
+              let total = 0
+              let deposits = 1
+              for (let d in deposit_info.deposits) {
+                _print('\n╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳\n\n')
+                let deposit = deposit_info.deposits[d]
+                let deposit_record = show_time(deposit.time.__time__)
+                _print(`date of deposit: ${deposit_record.date}`)
+                _print(`time of deposit: ${deposit_record.time}`)
+                amount = parseFloat(deposit.amount.__fixed__);
+                total = total + amount
+                _print(`amount deposited: ${amount} ${token.bold()}`)
+                deposits = deposits + 1
+              }
+              _print('\n╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳\n')
+              _print(`current yield: ${deposit_info.yield_info.current_yield}%`)
+              _print(`you are staking: ${total} ${token.bold()} out of ${contract_meta.StakedBalance} ${token.bold()} or (${(parseFloat(total / contract_meta.StakedBalance).toFixed(4)) * 100}% of the pool) || value: $${parseFloat(total) * token_price}`)
             }
-            _print('\n╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳╳\n')
-            _print(`current yield: ${deposit_info.yield_info.current_yield}%`)
-            _print(`you are staking: ${total} ${token.bold()} out of ${contract_meta.StakedBalance} ${token.bold()} or (${(parseFloat(total / contract_meta.StakedBalance).toFixed(4)) * 100}% of the pool) || value: $${parseFloat(total) * token_price}`)
+            catch {
+              _print(`staking analytics: ${contract_meta.StakedBalance} ${token.bold()} being staked`)
+
+            }
             _print_href(`Scan ${platform} Addresses`, `https://www.tauhq.com/addresses/${contract_name}`)
             _print_href('[View Contract Details]', `https://www.tauhq.com/contracts/${contract_name}`)
 
@@ -1196,7 +1230,7 @@ class RocketSwapController {
             const staking_cookie = localStorage.getItem('tau_staking_approved');
             let contractApproved;
             if (staking_cookie) {
-              staking_cookie = contractApproved 
+              staking_cookie = contractApproved
             }
             else {
               contractApproved = false
@@ -1230,7 +1264,7 @@ class RocketSwapController {
                     const handleResults = async (txResults) => {
                       hideLoading()
                       _stake_resolver(txResults, total, token_contract)
-                      window.scrollTo(0,document.body.scrollHeight);
+                      window.scrollTo(0, document.body.scrollHeight);
                     }
                     connector.lwc.sendTransaction(txInfo, handleResults)
                     _print('\nawaiting transaction result...')
@@ -1254,7 +1288,7 @@ class RocketSwapController {
                   if (approved) {
                     localStorage.setItem('tau_staking_approved', true);
                   }
-                  window.scrollTo(0,document.body.scrollHeight);
+                  window.scrollTo(0, document.body.scrollHeight);
                 }
                 connector.lwc.sendTransaction(send_contract_approval, handleResults)
                 _print('\nawaiting transaction result...')
@@ -1349,11 +1383,11 @@ class RocketSwapController {
 
             _print_link(`Stake [${token.bold()}]`, () => {
               stake()
-              window.scrollTo(0,document.body.scrollHeight);
+              window.scrollTo(0, document.body.scrollHeight);
             }, `stake_${guid()}`)
             _print_link(`Unstake [${token.bold()}]`, () => {
               unstake()
-              window.scrollTo(0,document.body.scrollHeight);
+              window.scrollTo(0, document.body.scrollHeight);
             }, `unstake_${guid()}`)
             /*
              
@@ -1384,16 +1418,16 @@ class RocketSwapController {
           }
           _print_link('[1] - [TAU --> ROCKETSWAP STAKING]', () => {
             loadStakingContract('con_simple_staking_tau_rswp_001', TOKENPRICE, this.connector, this.show_menu, this.menu_controller, this.userWalletData);
-            window.scrollTo(0,document.body.scrollHeight);
+            window.scrollTo(0, document.body.scrollHeight);
             this.change_menu('tau_staking')
           }, `tau_staking_${uuid}_${guid()}`)
           _print_link('[2] - [ROCKETSWAP --> ROCKETSWAP STAKING]\n', () => {
             loadStakingContract('con_staking_rswp_rswp', TOKENPRICE, this.connector, this.show_menu, this.menu_controller, this.userWalletData)
-            window.scrollTo(0,document.body.scrollHeight);
+            window.scrollTo(0, document.body.scrollHeight);
             this.change_menu('rswp_staking')
           }, `rswp_staking_${uuid}_${guid()}`)
 
-          window.scrollTo(0,document.body.scrollHeight);
+          window.scrollTo(0, document.body.scrollHeight);
         }, `user_staking_${uuid}_${guid()}`)
       },
       'user_balances': (uuid) => {
@@ -1440,7 +1474,7 @@ class RocketSwapController {
 
 
       })
-      window.scrollTo(0,document.body.scrollHeight);
+      window.scrollTo(0, document.body.scrollHeight);
 
     }
     this.change_menu = function (new_view) {
@@ -1528,8 +1562,21 @@ class RocketSwapController {
     _print_bold('\n####################################################')
     _print_bold('################## USER HOLDINGS ###################')
     _print_bold('####################################################\n')
-    let tau_staked = user_stake.con_simple_staking_tau_rswp_001.yield_info.total_staked
-    let rswp_staked = user_stake.con_staking_rswp_rswp.yield_info.total_staked
+    let tau_staked;
+    let rswp_staked;
+    try {
+      tau_staked = user_stake.con_simple_staking_tau_rswp_001.yield_info.total_staked
+    } catch {
+      tau_staked = null
+    }
+
+    try {
+      rswp_staked = user_stake.con_staking_rswp_rswp.yield_info.total_staked
+    } catch {
+      rswp_staked = null
+    }
+
+
     let rswpTauPrice = this.token_list['con_rswp_lst001'].Last
     _print(`TAU Price: $ ${this.tauPrice} \nRSWP Price: $ ${this.rswpPrice}\nRSWP Tau Price: \u25C8 ${rswpTauPrice}`)
 
