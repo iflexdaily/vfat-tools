@@ -192,6 +192,24 @@ window.NETWORKS = {
       "https://s3.api.harmony.one"
     ]
   },
+<<<<<<< HEAD
+=======
+  LAMDEN: {
+    "chainId": "0x80",
+    "chainName": "Lamden Mainnet",
+    "nativeCurrency": {
+      "name": "Tau",
+      "symbol": "TAU",
+      "decimals": 18
+    },
+    "rpcUrls": [
+      "https://http-mainnet.hecochain.com"
+    ],
+    "blockExplorerUrls": [
+      "https://mainnet.lamden.io/"
+    ],
+  },
+>>>>>>> aeaeb47 (plz test)
 }
 
 const infuraId = atob(window.ETHEREUM_NODE_URL).split('/').pop()

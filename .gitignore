@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Created by https://www.toptal.com/developers/gitignore/api/webstorm+all,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=webstorm+all,macos
 
@@ -188,3 +189,7 @@ dist/
 
 # exclude backup files
 *~
+=======
+node_modules
+node_modules
+>>>>>>> aeaeb47 (plz test)
